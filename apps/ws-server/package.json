@@ -12,6 +12,8 @@
   },
   "private": true,
   "scripts": {
+    "build": "tsc --noEmit",
+    "check-types": "tsc --noEmit",
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
     "typecheck": "tsc --noEmit"

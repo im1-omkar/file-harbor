@@ -1,5 +1,4 @@
-
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 
 const SERVER_URL =
@@ -20,14 +19,39 @@ interface IncomingFile {
   type: string;
 }
 
+function getDeviceName(): string {
+  if (typeof navigator === "undefined") return "Web Client";
+  const ua = navigator.userAgent;
+  let browser = "Browser";
+  if (ua.includes("Firefox")) browser = "Firefox";
+  else if (ua.includes("Edg")) browser = "Edge";
+  else if (ua.includes("Chrome")) browser = "Chrome";
+  else if (ua.includes("Safari")) browser = "Safari";
+
+  let os = "Device";
+  if (ua.includes("Win")) os = "Windows";
+  else if (ua.includes("Mac")) os = "macOS";
+  else if (ua.includes("Linux")) os = "Linux";
+  else if (ua.includes("Android")) os = "Android";
+  else if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS";
+
+  return `${browser} on ${os}`;
+}
+
 export default function App() {
   // ---------------- STATE ----------------
 
   const [roomId, setRoomId] = useState("9999");
   const [name, setName] = useState("Omkar");
+  const [currentRoom, setCurrentRoom] = useState<string | null>(null);
 
   const [socketId, setSocketId] = useState("");
   const [peers, setPeers] = useState<Peer[]>([]);
+
+  const [incomingRequest, setIncomingRequest] = useState<{
+    from: string;
+    peer: Peer;
+  } | null>(null);
 
   const [connected, setConnected] = useState(false);
   const [status, setStatus] = useState("Not connected");
@@ -42,18 +66,192 @@ export default function App() {
   const dcRef = useRef<RTCDataChannel | null>(null);
 
   const targetRef = useRef<string | null>(null);
-
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
 
   const incomingFile = useRef<IncomingFile | null>(null);
   const receivedChunks = useRef<BlobPart[]>([]);
   const receivedBytes = useRef(0);
 
+  // ---------------- PEER CONNECTION HELPERS ----------------
+
+  const closePeerConnection = useCallback(() => {
+    dcRef.current?.close();
+    pcRef.current?.close();
+
+    dcRef.current = null;
+    pcRef.current = null;
+
+    targetRef.current = null;
+    pendingCandidates.current = [];
+    incomingFile.current = null;
+    receivedChunks.current = [];
+    receivedBytes.current = 0;
+
+    setConnected(false);
+    setProgress(0);
+  }, []);
+
+  const flushPendingCandidates = useCallback(async (pc: RTCPeerConnection) => {
+    const candidates = pendingCandidates.current.splice(0);
+
+    for (const candidate of candidates) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (error) {
+        console.error("Failed to add pending ICE candidate:", error);
+      }
+    }
+  }, []);
+
+  // ---------------- FILE RECEIVING ----------------
+
+  const receiveMessage = useCallback((data: string | ArrayBuffer) => {
+    if (typeof data === "string") {
+      try {
+        const message = JSON.parse(data);
+
+        if (message.type === "file-start") {
+          incomingFile.current = {
+            name: message.name,
+            size: message.size,
+            type: message.mimeType,
+          };
+
+          receivedChunks.current = [];
+          receivedBytes.current = 0;
+
+          setProgress(0);
+          setStatus(`Receiving ${message.name}...`);
+        }
+
+        if (message.type === "file-end") {
+          const fileInfo = incomingFile.current;
+          if (!fileInfo) return;
+
+          if (receivedBytes.current !== fileInfo.size) {
+            setStatus("File size mismatch. Transfer incomplete.");
+            return;
+          }
+
+          const blob = new Blob(receivedChunks.current, {
+            type: fileInfo.type || "application/octet-stream",
+          });
+
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+
+          anchor.href = url;
+          anchor.download = fileInfo.name;
+          anchor.click();
+
+          setTimeout(() => URL.revokeObjectURL(url), 60_000);
+
+          setStatus(`Received ${fileInfo.name} successfully!`);
+
+          incomingFile.current = null;
+          receivedChunks.current = [];
+          receivedBytes.current = 0;
+          setProgress(100);
+        }
+      } catch (err) {
+        console.error("Failed to parse data channel message:", err);
+      }
+      return;
+    }
+
+    // Binary file chunks
+    const fileInfo = incomingFile.current;
+    if (!fileInfo) return;
+
+    receivedChunks.current.push(data);
+    receivedBytes.current += data.byteLength;
+
+    setProgress(
+      Math.min(100, Math.round((receivedBytes.current / fileInfo.size) * 100)),
+    );
+  }, []);
+
+  // ---------------- DATA CHANNEL ----------------
+
+  const setupDataChannel = useCallback(
+    (dc: RTCDataChannel) => {
+      dcRef.current = dc;
+
+      dc.binaryType = "arraybuffer";
+      dc.bufferedAmountLowThreshold = BUFFER_LIMIT / 2;
+
+      dc.onopen = () => {
+        setConnected(true);
+        setStatus("DataChannel open. Ready to transfer files!");
+      };
+
+      dc.onclose = () => {
+        setConnected(false);
+        setStatus("DataChannel closed");
+      };
+
+      dc.onerror = (error) => {
+        console.error("DataChannel error:", error);
+        setStatus("DataChannel error");
+      };
+
+      dc.onmessage = (event) => {
+        receiveMessage(event.data);
+      };
+    },
+    [receiveMessage],
+  );
+
+  const createPeerConnection = useCallback(
+    (targetSocketId: string) => {
+      closePeerConnection();
+
+      pendingCandidates.current = [];
+
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          {
+            urls: "stun:stun.l.google.com:19302",
+          },
+        ],
+      });
+
+      pcRef.current = pc;
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socketRef.current?.emit("ice-candidate", {
+            targetSocketId,
+            candidate: event.candidate.toJSON(),
+          });
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        console.log("WebRTC state:", pc.connectionState);
+
+        if (pc.connectionState === "connected") {
+          setStatus("P2P connection established!");
+        }
+
+        if (
+          pc.connectionState === "failed" ||
+          pc.connectionState === "disconnected" ||
+          pc.connectionState === "closed"
+        ) {
+          setConnected(false);
+        }
+      };
+
+      return pc;
+    },
+    [closePeerConnection],
+  );
+
   // ---------------- SOCKET CONNECTION ----------------
 
   useEffect(() => {
     const socket = io(SERVER_URL);
-
     socketRef.current = socket;
 
     socket.on("connect", () => {
@@ -64,32 +262,24 @@ export default function App() {
     socket.on("disconnect", () => {
       setStatus("Signaling server disconnected");
       setPeers([]);
+      setCurrentRoom(null);
+      setIncomingRequest(null);
     });
 
     // Updated room peer list
-    socket.on("room-updated", ({ peers }: { peers: Peer[] }) => {
-      setPeers(peers.filter(p => p.socketId !== socket.id));
+    socket.on("room-updated", ({ peers: updatedPeers }: { peers: Peer[] }) => {
+      setPeers(updatedPeers.filter((p) => p.socketId !== socket.id));
     });
 
     // Someone wants to connect
     socket.on("connection-request", ({ from, peer }) => {
-      const accepted = window.confirm(
-        `${peer.name} (${peer.device}) wants to connect. Accept?`
-      );
+      setIncomingRequest({ from, peer });
+      setStatus(`Incoming connection request from ${peer.name}`);
+    });
 
-      if (accepted) {
-        socket.emit("accept-connection", {
-          targetSocketId: from,
-        }, (res: any) => {
-          if (!res?.success) {
-            setStatus(res?.message || "Could not accept connection");
-          }
-        });
-      } else {
-        socket.emit("reject-connection", {
-          targetSocketId: from,
-        });
-      }
+    // Request was rejected
+    socket.on("connection-rejected", () => {
+      setStatus("Connection request was rejected by peer");
     });
 
     // We are the initiator: create offer
@@ -108,7 +298,10 @@ export default function App() {
 
         socket.emit("webrtc-offer", {
           targetSocketId: from,
-          offer: pc.localDescription,
+          offer: {
+            type: pc.localDescription!.type,
+            sdp: pc.localDescription!.sdp,
+          },
         });
 
         setStatus("Offer sent. Waiting for answer...");
@@ -124,19 +317,14 @@ export default function App() {
 
       try {
         const queuedCandidates = pendingCandidates.current;
-
         const pc = createPeerConnection(from);
-
         pendingCandidates.current = queuedCandidates;
 
-        // Receiver gets the DataChannel created by initiator
         pc.ondatachannel = (event) => {
           setupDataChannel(event.channel);
         };
 
-        await pc.setRemoteDescription(offer);
-
-        // Apply ICE candidates received before the offer
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
         await flushPendingCandidates(pc);
 
         const answer = await pc.createAnswer();
@@ -144,7 +332,10 @@ export default function App() {
 
         socket.emit("webrtc-answer", {
           targetSocketId: from,
-          answer: pc.localDescription,
+          answer: {
+            type: pc.localDescription!.type,
+            sdp: pc.localDescription!.sdp,
+          },
         });
 
         setStatus("Answer sent. Establishing P2P connection...");
@@ -157,11 +348,10 @@ export default function App() {
     // Initiator receives answer
     socket.on("webrtc-answer", async ({ answer }) => {
       const pc = pcRef.current;
-
       if (!pc || pc.signalingState !== "have-local-offer") return;
 
       try {
-        await pc.setRemoteDescription(answer);
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
         await flushPendingCandidates(pc);
       } catch (error) {
         console.error(error);
@@ -179,18 +369,22 @@ export default function App() {
       }
 
       try {
-        await pc.addIceCandidate(candidate);
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
       } catch (error) {
         console.error("ICE candidate error:", error);
       }
     });
 
     // Peer disconnected
-    socket.on("peer-disconnected", ({ socketId }) => {
-      if (targetRef.current === socketId) {
+    socket.on("peer-disconnected", ({ socketId: disconnectedId }) => {
+      if (targetRef.current === disconnectedId) {
         closePeerConnection();
         setStatus("Peer disconnected");
       }
+      setPeers((prev) => prev.filter((p) => p.socketId !== disconnectedId));
+      setIncomingRequest((prev) =>
+        prev?.from === disconnectedId ? null : prev,
+      );
     });
 
     return () => {
@@ -198,9 +392,14 @@ export default function App() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, []);
+  }, [
+    createPeerConnection,
+    setupDataChannel,
+    flushPendingCandidates,
+    closePeerConnection,
+  ]);
 
-  // ---------------- JOIN ROOM ----------------
+  // ---------------- USER ACTIONS ----------------
 
   function joinRoom() {
     const socket = socketRef.current;
@@ -210,207 +409,83 @@ export default function App() {
       return;
     }
 
-    const device = navigator.userAgent;
+    const device = getDeviceName();
 
     socket.emit(
       "join-room",
       { roomId, name, device },
-      (res: any) => {
+      (res: {
+        success: boolean;
+        message?: string;
+        roomId?: string;
+        peers?: Peer[];
+      }) => {
         if (!res.success) {
-          setStatus(res.message);
+          setStatus(res.message || "Failed to join room");
           return;
         }
 
-        setPeers(res.peers);
-        setStatus(`Joined room ${res.roomId}`);
-      }
+        setPeers(res.peers || []);
+        setCurrentRoom(res.roomId || roomId);
+        setStatus(`Joined room ${res.roomId || roomId}`);
+      },
     );
   }
 
-  // ---------------- PEER CONNECTION ----------------
+  function leaveRoom() {
+    const socket = socketRef.current;
+    if (!socket) return;
 
-  function createPeerConnection(targetSocketId: string) {
+    socket.emit("leave-room");
     closePeerConnection();
-
-    pendingCandidates.current = [];
-
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        {
-          urls: "stun:stun.l.google.com:19302",
-        },
-      ],
-    });
-
-    pcRef.current = pc;
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socketRef.current?.emit("ice-candidate", {
-          targetSocketId,
-          candidate: event.candidate.toJSON(),
-        });
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log("WebRTC state:", pc.connectionState);
-
-      if (pc.connectionState === "connected") {
-        setStatus("P2P connection established!");
-      }
-
-      if (
-        pc.connectionState === "failed" ||
-        pc.connectionState === "disconnected" ||
-        pc.connectionState === "closed"
-      ) {
-        setConnected(false);
-      }
-    };
-
-    return pc;
+    setCurrentRoom(null);
+    setPeers([]);
+    setIncomingRequest(null);
+    setStatus("Left room");
   }
-
-  async function flushPendingCandidates(pc: RTCPeerConnection) {
-    const candidates = pendingCandidates.current.splice(0);
-
-    for (const candidate of candidates) {
-      await pc.addIceCandidate(candidate);
-    }
-  }
-
-  function closePeerConnection() {
-    dcRef.current?.close();
-    pcRef.current?.close();
-
-    dcRef.current = null;
-    pcRef.current = null;
-
-    targetRef.current = null;
-    pendingCandidates.current = [];
-    incomingFile.current = null;
-    receivedChunks.current = [];
-    receivedBytes.current = 0;
-
-    setConnected(false);
-    setProgress(0);
-  }
-
-  // ---------------- CONNECTION REQUEST ----------------
 
   function requestConnection(targetSocketId: string) {
     socketRef.current?.emit(
       "request-connection",
       { targetSocketId },
-      (res: any) => {
+      (res: { success: boolean; message?: string }) => {
         if (!res.success) {
-          setStatus(res.message);
+          setStatus(res.message || "Failed to request connection");
           return;
         }
 
-        setStatus("Connection request sent");
-      }
+        setStatus("Connection request sent. Waiting for peer response...");
+      },
     );
   }
 
-  // ---------------- DATA CHANNEL ----------------
+  function acceptConnection() {
+    if (!incomingRequest || !socketRef.current) return;
+    const { from } = incomingRequest;
+    setIncomingRequest(null);
 
-  function setupDataChannel(dc: RTCDataChannel) {
-    dcRef.current = dc;
-
-    dc.binaryType = "arraybuffer";
-    dc.bufferedAmountLowThreshold = BUFFER_LIMIT / 2;
-
-    dc.onopen = () => {
-      setConnected(true);
-      setStatus("DataChannel open. Ready to transfer files!");
-    };
-
-    dc.onclose = () => {
-      setConnected(false);
-      setStatus("DataChannel closed");
-    };
-
-    dc.onerror = (error) => {
-      console.error("DataChannel error:", error);
-      setStatus("DataChannel error");
-    };
-
-    dc.onmessage = (event) => {
-      receiveMessage(event.data);
-    };
-  }
-
-  // ---------------- FILE RECEIVING ----------------
-
-  function receiveMessage(data: string | ArrayBuffer) {
-    // Metadata and completion messages are JSON strings
-    if (typeof data === "string") {
-      const message = JSON.parse(data);
-
-      if (message.type === "file-start") {
-        incomingFile.current = {
-          name: message.name,
-          size: message.size,
-          type: message.mimeType,
-        };
-
-        receivedChunks.current = [];
-        receivedBytes.current = 0;
-
-        setProgress(0);
-        setStatus(`Receiving ${message.name}`);
-      }
-
-      if (message.type === "file-end") {
-        const fileInfo = incomingFile.current;
-
-        if (!fileInfo) return;
-
-        if (receivedBytes.current !== fileInfo.size) {
-          setStatus("File size mismatch. Transfer incomplete.");
-          return;
+    socketRef.current.emit(
+      "accept-connection",
+      { targetSocketId: from },
+      (res: { success: boolean; message?: string }) => {
+        if (!res?.success) {
+          setStatus(res?.message || "Could not accept connection");
+        } else {
+          setStatus("Connection accepted. Waiting for WebRTC offer...");
         }
-
-        const blob = new Blob(receivedChunks.current, {
-          type: fileInfo.type || "application/octet-stream",
-        });
-
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-
-        anchor.href = url;
-        anchor.download = fileInfo.name;
-        anchor.click();
-
-        setTimeout(() => URL.revokeObjectURL(url), 60_000);
-
-        setStatus(`Received ${fileInfo.name} successfully!`);
-
-        incomingFile.current = null;
-        receivedChunks.current = [];
-        receivedBytes.current = 0;
-        setProgress(100);
-      }
-
-      return;
-    }
-
-    // Binary file chunks
-    const fileInfo = incomingFile.current;
-
-    if (!fileInfo) return;
-
-    receivedChunks.current.push(data);
-    receivedBytes.current += data.byteLength;
-
-    setProgress(
-      Math.min(
-        100,
-        Math.round((receivedBytes.current / fileInfo.size) * 100)
-      )
+      },
     );
+  }
+
+  function rejectConnection() {
+    if (!incomingRequest || !socketRef.current) return;
+    const { from } = incomingRequest;
+    setIncomingRequest(null);
+
+    socketRef.current.emit("reject-connection", {
+      targetSocketId: from,
+    });
+    setStatus("Connection request rejected");
   }
 
   // ---------------- FILE SENDING ----------------
@@ -450,7 +525,6 @@ export default function App() {
       dc.addEventListener("close", onClose);
       dc.addEventListener("error", onError);
 
-      // Handle a drain that happened before listeners were attached
       if (dc.bufferedAmount <= BUFFER_LIMIT) {
         onLow();
       }
@@ -469,102 +543,221 @@ export default function App() {
       const file = selectedFile;
 
       setProgress(0);
-      setStatus(`Sending ${file.name}`);
+      setStatus(`Sending ${file.name}...`);
 
-      // Tell receiver about the incoming file
       dc.send(
         JSON.stringify({
           type: "file-start",
           name: file.name,
           size: file.size,
           mimeType: file.type,
-        })
+        }),
       );
 
       let sentBytes = 0;
 
-      // Read and send one chunk at a time
       while (sentBytes < file.size) {
         await waitForBufferDrain(dc);
 
         if (dc.readyState !== "open") {
-          throw new Error("Connection closed");
+          throw new Error("Connection closed during transfer");
         }
 
-        const chunk = file.slice(
-          sentBytes,
-          sentBytes + CHUNK_SIZE
-        );
-
+        const chunk = file.slice(sentBytes, sentBytes + CHUNK_SIZE);
         const buffer = await chunk.arrayBuffer();
 
         dc.send(buffer);
-
         sentBytes += buffer.byteLength;
 
-        setProgress(
-          Math.round((sentBytes / file.size) * 100)
-        );
+        setProgress(Math.round((sentBytes / file.size) * 100));
       }
 
-      // Tell receiver transfer is complete
       await waitForBufferDrain(dc);
 
       dc.send(
         JSON.stringify({
           type: "file-end",
-        })
+        }),
       );
 
       setStatus(`File sent: ${file.name}`);
     } catch (error) {
       console.error(error);
-      setStatus(
-        error instanceof Error ? error.message : "Transfer failed"
-      );
+      setStatus(error instanceof Error ? error.message : "Transfer failed");
     }
   }
 
   // ---------------- UI ----------------
 
   return (
-    <main style={{ padding: 24, fontFamily: "sans-serif" }}>
+    <main
+      style={{
+        padding: 24,
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        maxWidth: 680,
+        margin: "0 auto",
+      }}
+    >
       <h2>File Harbor</h2>
 
-      <p>{status}</p>
+      <div
+        style={{
+          background: "#f3f4f6",
+          padding: "12px 16px",
+          borderRadius: 8,
+          marginBottom: 16,
+        }}
+      >
+        <p style={{ margin: "4px 0" }}>
+          <strong>Status:</strong> {status}
+        </p>
+        <p style={{ margin: "4px 0", fontSize: 13, color: "#666" }}>
+          <strong>Your Socket ID:</strong> {socketId || "Connecting..."}
+        </p>
+        {currentRoom && (
+          <p style={{ margin: "4px 0", fontSize: 13, color: "#166534" }}>
+            <strong>Active Room:</strong> {currentRoom}
+          </p>
+        )}
+      </div>
+
+      {incomingRequest && (
+        <div
+          style={{
+            background: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            padding: 16,
+            borderRadius: 8,
+            marginBottom: 16,
+          }}
+        >
+          <p style={{ margin: "0 0 10px 0" }}>
+            <strong>{incomingRequest.peer.name}</strong> (
+            {incomingRequest.peer.device}) wants to connect.
+          </p>
+          <button
+            onClick={acceptConnection}
+            style={{
+              background: "#2563eb",
+              color: "#fff",
+              border: "none",
+              padding: "6px 14px",
+              borderRadius: 4,
+              cursor: "pointer",
+              marginRight: 8,
+            }}
+          >
+            Accept
+          </button>
+          <button
+            onClick={rejectConnection}
+            style={{
+              background: "#dc2626",
+              color: "#fff",
+              border: "none",
+              padding: "6px 14px",
+              borderRadius: 4,
+              cursor: "pointer",
+            }}
+          >
+            Reject
+          </button>
+        </div>
+      )}
 
       <hr />
 
       <h3>Join Room</h3>
 
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Your name"
-      />
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Your name"
+          style={{
+            padding: "6px 10px",
+            borderRadius: 4,
+            border: "1px solid #ccc",
+          }}
+        />
 
-      <input
-        value={roomId}
-        onChange={(e) => setRoomId(e.target.value)}
-        placeholder="Room ID"
-      />
+        <input
+          value={roomId}
+          onChange={(e) => setRoomId(e.target.value)}
+          placeholder="Room ID"
+          style={{
+            padding: "6px 10px",
+            borderRadius: 4,
+            border: "1px solid #ccc",
+          }}
+        />
 
-      <button onClick={joinRoom}>Join Room</button>
+        <button
+          onClick={joinRoom}
+          disabled={Boolean(currentRoom)}
+          style={{
+            padding: "6px 14px",
+            borderRadius: 4,
+            cursor: currentRoom ? "not-allowed" : "pointer",
+          }}
+        >
+          Join Room
+        </button>
+
+        {currentRoom && (
+          <button
+            onClick={leaveRoom}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 4,
+              cursor: "pointer",
+              background: "#f87171",
+              color: "#fff",
+              border: "none",
+            }}
+          >
+            Leave Room
+          </button>
+        )}
+      </div>
 
       <hr />
 
       <h3>Peers in Room</h3>
 
-      {peers.length === 0 && <p>No other peers found.</p>}
+      {peers.length === 0 && (
+        <p style={{ color: "#777" }}>
+          {currentRoom
+            ? "No other peers in this room."
+            : "Join a room to see peers."}
+        </p>
+      )}
 
       {peers.map((peer) => (
-        <div key={peer.socketId} style={{ marginBottom: 12 }}>
+        <div
+          key={peer.socketId}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "8px 12px",
+            background: "#fafafa",
+            border: "1px solid #eee",
+            borderRadius: 6,
+            marginBottom: 8,
+          }}
+        >
           <span>
-            {peer.name} — {peer.device}
+            <strong>{peer.name}</strong> — {peer.device}
           </span>
 
           <button
             onClick={() => requestConnection(peer.socketId)}
+            style={{
+              padding: "4px 12px",
+              borderRadius: 4,
+              cursor: "pointer",
+            }}
           >
             Connect
           </button>
@@ -575,24 +768,42 @@ export default function App() {
 
       <h3>P2P Connection</h3>
 
-      <p>
-        DataChannel: {connected ? "Connected" : "Not connected"}
-      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <p style={{ margin: 0 }}>
+          DataChannel:{" "}
+          <strong style={{ color: connected ? "#16a34a" : "#dc2626" }}>
+            {connected ? "Connected" : "Not connected"}
+          </strong>
+        </p>
+        {connected && (
+          <button
+            onClick={closePeerConnection}
+            style={{
+              padding: "4px 10px",
+              borderRadius: 4,
+              cursor: "pointer",
+              fontSize: 12,
+            }}
+          >
+            Disconnect P2P
+          </button>
+        )}
+      </div>
 
       <hr />
 
       <h3>Send File</h3>
 
-      <input
-        type="file"
-        onChange={(e) =>
-          setSelectedFile(e.target.files?.[0] || null)
-        }
-      />
+      <div style={{ marginBottom: 12 }}>
+        <input
+          type="file"
+          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+        />
+      </div>
 
       {selectedFile && (
-        <p>
-          {selectedFile.name} (
+        <p style={{ margin: "8px 0" }}>
+          Selected: <strong>{selectedFile.name}</strong> (
           {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)
         </p>
       )}
@@ -600,14 +811,27 @@ export default function App() {
       <button
         onClick={sendFile}
         disabled={!connected || !selectedFile}
+        style={{
+          padding: "8px 16px",
+          background: connected && selectedFile ? "#16a34a" : "#ccc",
+          color: "#fff",
+          border: "none",
+          borderRadius: 4,
+          cursor: connected && selectedFile ? "pointer" : "not-allowed",
+          fontWeight: 600,
+        }}
       >
         Send File
       </button>
 
-      <p>Transfer progress: {progress}%</p>
-
-      <progress value={progress} max={100} />
-
+      <div style={{ marginTop: 16 }}>
+        <p style={{ margin: "4px 0" }}>Transfer progress: {progress}%</p>
+        <progress
+          value={progress}
+          max={100}
+          style={{ width: "100%", height: 16 }}
+        />
+      </div>
     </main>
   );
 }
