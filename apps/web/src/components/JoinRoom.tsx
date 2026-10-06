@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { LogIn, LogOut } from "lucide-react";
+import { ArrowRight, LogOut } from "lucide-react";
 
 interface Props {
   roomId: string;
@@ -21,63 +21,68 @@ export function JoinRoom({
   onLeave,
 }: Props) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.1 }}
-    >
+    <div className="w-full space-y-3">
+      <div className="flex items-center justify-between">
+        <label className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+          Room Session
+        </label>
+        {currentRoom && (
+          <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Connected to {currentRoom}
+          </span>
+        )}
+      </div>
+
       <AnimatePresence mode="wait">
         {!currentRoom ? (
           <motion.div
-            key="join"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+            key="join-inputs"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             className="space-y-3"
           >
-            <div className="flex gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <input
                 value={name}
                 onChange={(e) => onNameChange(e.target.value)}
                 placeholder="Your name"
-                className="flex-1 bg-dark-800 border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-white/90 placeholder-white/20 focus:border-white/20 transition-colors"
+                className="sm:col-span-2 bg-black border border-zinc-800 rounded-md px-3 py-2 text-sm text-white placeholder-zinc-600 font-mono transition-colors"
               />
               <input
                 value={roomId}
                 onChange={(e) => onRoomIdChange(e.target.value)}
                 placeholder="Room ID"
-                className="w-28 bg-dark-800 border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-white/90 placeholder-white/20 focus:border-white/20 transition-colors font-mono"
+                className="bg-black border border-zinc-800 rounded-md px-3 py-2 text-sm text-white placeholder-zinc-600 font-mono transition-colors"
               />
             </div>
 
             <button
               onClick={onJoin}
-              className="w-full group relative overflow-hidden bg-white text-black font-semibold text-sm py-3 px-6 rounded-xl hover:shadow-[0_0_20px_rgba(255,255,255,0.15)] transition-all duration-300"
+              className="w-full bg-white text-black font-medium text-sm py-2 px-4 rounded-md hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span className="relative z-10 flex items-center justify-center gap-2">
-                <LogIn size={16} />
-                Join Room
-              </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+              <span>Join Room</span>
+              <ArrowRight size={14} />
             </button>
           </motion.div>
         ) : (
           <motion.div
-            key="leave"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+            key="leave-input"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
             <button
               onClick={onLeave}
-              className="w-full flex items-center justify-center gap-2 bg-dark-800 border border-white/[0.06] text-white/60 hover:text-danger hover:border-danger/30 text-sm py-2.5 px-4 rounded-xl transition-all duration-200"
+              className="w-full bg-black border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white font-medium text-sm py-2 px-4 rounded-md transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
               <LogOut size={14} />
-              Leave Room
+              <span>Leave Room</span>
             </button>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }

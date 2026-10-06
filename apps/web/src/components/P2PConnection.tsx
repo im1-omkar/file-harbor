@@ -11,18 +11,18 @@ export function P2PConnection({ connected, onDisconnect }: Props) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-success/10 border border-success/30 text-success text-xs font-mono backdrop-blur-xl"
+      className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-black border border-emerald-500/30 text-emerald-400 text-[11px] font-mono select-none"
     >
       <Link2 size={12} className="animate-pulse" />
       <span>P2P Channel Active</span>
       <button
         onClick={onDisconnect}
-        className="ml-1 p-0.5 hover:bg-danger/20 hover:text-danger rounded transition-colors text-white/50"
-        title="Disconnect P2P"
+        className="ml-1 text-zinc-500 hover:text-red-400 transition-colors cursor-pointer"
+        title="Disconnect P2P Channel"
       >
-        <Unlink size={12} />
+        <Unlink size={11} />
       </button>
     </motion.div>
   );

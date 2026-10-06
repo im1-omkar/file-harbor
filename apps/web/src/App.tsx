@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Shield, Zap } from "lucide-react";
 
 import { ConnectionRequest } from "./components/ConnectionRequest";
+import { FeaturesPanel } from "./components/FeaturesPanel";
 import { JoinRoom } from "./components/JoinRoom";
+import { LogoMark } from "./components/LogoMark";
 import { P2PConnection } from "./components/P2PConnection";
 import { PeerList } from "./components/PeerList";
 import { SendFile } from "./components/SendFile";
@@ -31,94 +32,100 @@ export default function App() {
   });
 
   return (
-    <div className="relative min-h-screen bg-dark-950 text-white font-sans overflow-x-hidden lightning-bg selection:bg-white selection:text-black">
-      {/* Top Left Status & Connection Info */}
+    <div className="relative min-h-screen bg-black text-fafafa font-sans selection:bg-white selection:text-black">
+      {/* Top Left Status Info */}
       <StatusPanel
         status={signaling.status}
         socketId={signaling.socketId}
         currentRoom={signaling.currentRoom}
       />
 
-      {/* Connection Request Floating Banner */}
+      {/* Connection Request Prompt Banner */}
       <ConnectionRequest
         request={signaling.incomingRequest}
         onAccept={signaling.acceptConnection}
         onReject={signaling.rejectConnection}
       />
 
-      {/* Main Container */}
-      <div className="relative z-10 max-w-4xl mx-auto px-4 py-8 min-h-screen flex flex-col justify-between">
-        {/* Header Branding */}
-        <header className="flex items-center justify-between pt-2 pb-6">
-          <div className="w-24" /> {/* Spacer to balance left status panel */}
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-6 min-h-screen flex flex-col justify-between">
+        {/* Top Header */}
+        <header className="flex items-center justify-between pt-2 pb-6 border-b border-zinc-800">
+          <div className="w-28" /> {/* Left spacer to balance top-left status panel */}
 
+          {/* Vercel-style Brand Title */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-              <Zap size={16} className="text-white" />
-            </div>
-            <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-white/90 to-white/60 bg-clip-text text-transparent">
+            <LogoMark size={20} className="text-white" />
+            <h1 className="text-base font-semibold tracking-tight text-white">
               File Harbor
             </h1>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-white/40">
+          {/* Right Header Status Pill */}
+          <div className="flex items-center gap-2">
             <P2PConnection
               connected={webRTC.connected}
               onDisconnect={webRTC.closePeerConnection}
             />
             {!webRTC.connected && (
-              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06]">
-                <Shield size={12} className="text-white/40" />
-                <span>P2P Encrypted</span>
-              </div>
+              <span className="hidden sm:inline-block text-[11px] font-mono text-zinc-500 border border-zinc-800 rounded px-2 py-0.5">
+                P2P Encrypted
+              </span>
             )}
           </div>
         </header>
 
-        {/* Center Core Area: Device Radar Hub & Orbiting Peers */}
-        <main className="my-auto py-6 space-y-10">
-          {/* Radar & Orbiting Peers Component */}
-          <section className="relative">
-            <PeerList
-              peers={signaling.peers}
-              currentRoom={signaling.currentRoom}
-              userName={name}
-              userDevice={userDevice}
-              onConnect={signaling.requestConnection}
-            />
-          </section>
+        {/* Main Section Layout */}
+        <main className="my-auto py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+            {/* Center Area: Central Radar Hub + Form Actions (7-8 cols on desktop) */}
+            <div className="lg:col-span-7 xl:col-span-8 space-y-8">
+              {/* Radar Hub */}
+              <section className="relative py-2">
+                <PeerList
+                  peers={signaling.peers}
+                  currentRoom={signaling.currentRoom}
+                  userName={name}
+                  userDevice={userDevice}
+                  onConnect={signaling.requestConnection}
+                />
+              </section>
 
-          {/* Central Actions Grid: Join Room & Send File */}
-          <div className="max-w-md mx-auto space-y-4 pt-4">
-            {/* Join / Leave Room Panel */}
-            <div className="bg-dark-900/60 border border-white/[0.08] rounded-2xl p-5 backdrop-blur-xl shadow-2xl">
-              <JoinRoom
-                roomId={roomId}
-                name={name}
-                currentRoom={signaling.currentRoom}
-                onRoomIdChange={setRoomId}
-                onNameChange={setName}
-                onJoin={() => signaling.joinRoom(roomId, name)}
-                onLeave={signaling.leaveRoom}
-              />
+              {/* Clean Action Sections Separated by Thin Lines (NO heavy cards!) */}
+              <div className="max-w-md mx-auto space-y-6 pt-4 border-t border-zinc-800">
+                {/* Join Room Section */}
+                <JoinRoom
+                  roomId={roomId}
+                  name={name}
+                  currentRoom={signaling.currentRoom}
+                  onRoomIdChange={setRoomId}
+                  onNameChange={setName}
+                  onJoin={() => signaling.joinRoom(roomId, name)}
+                  onLeave={signaling.leaveRoom}
+                />
+
+                {/* Send File Section */}
+                <div className="pt-2 border-t border-zinc-900">
+                  <SendFile
+                    file={fileTransfer.selectedFile}
+                    progress={fileTransfer.progress}
+                    connected={webRTC.connected}
+                    onFileSelect={fileTransfer.setSelectedFile}
+                    onSend={() => fileTransfer.sendFile(webRTC.dcRef.current)}
+                  />
+                </div>
+              </div>
             </div>
 
-            {/* Send File Drag & Drop Panel */}
-            <div className="bg-dark-900/60 border border-white/[0.08] rounded-2xl p-5 backdrop-blur-xl shadow-2xl">
-              <SendFile
-                file={fileTransfer.selectedFile}
-                progress={fileTransfer.progress}
-                connected={webRTC.connected}
-                onFileSelect={fileTransfer.setSelectedFile}
-                onSend={() => fileTransfer.sendFile(webRTC.dcRef.current)}
-              />
+            {/* Right Side: Features & Functionality Panel (4-5 cols on desktop) */}
+            <div className="lg:col-span-5 xl:col-span-4 lg:border-l lg:border-zinc-800 lg:pl-8 pt-2">
+              <FeaturesPanel />
             </div>
           </div>
         </main>
 
         {/* Footer */}
-        <footer className="py-4 text-center text-xs text-white/20">
-          Direct P2P WebRTC Transfer • Zero Server Storage
+        <footer className="py-4 border-t border-zinc-800 text-center text-[11px] text-zinc-500 font-mono">
+          File Harbor • Direct Browser-to-Browser WebRTC Data Transfer
         </footer>
       </div>
     </div>

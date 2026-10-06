@@ -1,6 +1,6 @@
 import type { ConnectionRequest as ConnectionRequestType } from "../types/signaling";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, X, Check } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 
 interface Props {
   request: ConnectionRequestType | null;
@@ -13,21 +13,17 @@ export function ConnectionRequest({ request, onAccept, onReject }: Props) {
     <AnimatePresence>
       {request && (
         <motion.div
-          initial={{ opacity: 0, y: -20, scale: 0.95 }}
+          initial={{ opacity: 0, y: -16, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -20, scale: 0.95 }}
+          exit={{ opacity: 0, y: -16, scale: 0.98 }}
           className="fixed top-4 left-1/2 -translate-x-1/2 z-50"
         >
-          <div className="bg-dark-800/95 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-3.5 flex items-center gap-4 shadow-[0_0_30px_rgba(255,255,255,0.08)]">
-            <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-              <Zap size={14} className="text-white/70" />
-            </div>
-
-            <div className="mr-2">
-              <p className="text-xs font-semibold text-white/90">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 flex items-center gap-4 shadow-2xl">
+            <div>
+              <p className="text-xs font-semibold text-white">
                 {request.peer.name}
               </p>
-              <p className="text-[10px] text-white/40">
+              <p className="text-[11px] font-mono text-zinc-400">
                 {request.peer.device} wants to connect
               </p>
             </div>
@@ -35,18 +31,18 @@ export function ConnectionRequest({ request, onAccept, onReject }: Props) {
             <div className="flex items-center gap-2">
               <button
                 onClick={onAccept}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-success/15 hover:bg-success/25 border border-success/30 text-success text-xs font-semibold transition-all"
+                className="bg-white text-black hover:bg-zinc-200 text-xs font-medium px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                <Check size={14} />
                 <span>Accept</span>
+                <ArrowRight size={12} />
               </button>
 
               <button
                 onClick={onReject}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-danger/15 hover:bg-danger/25 border border-danger/30 text-danger text-xs font-semibold transition-all"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium px-2.5 py-1.5 rounded transition-colors flex items-center gap-1 cursor-pointer"
               >
-                <X size={14} />
-                <span>Reject</span>
+                <X size={12} />
+                <span>Decline</span>
               </button>
             </div>
           </div>

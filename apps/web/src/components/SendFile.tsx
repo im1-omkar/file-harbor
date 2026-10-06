@@ -20,12 +20,16 @@ export function SendFile({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.2 }}
-      className="w-full"
-    >
+    <div className="w-full space-y-3">
+      <div className="flex items-center justify-between">
+        <label className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+          File Transfer
+        </label>
+        <span className="text-[11px] font-mono text-zinc-500">
+          {connected ? "Peer Connected" : "No Active Peer"}
+        </span>
+      </div>
+
       <input
         ref={fileInputRef}
         type="file"
@@ -36,32 +40,26 @@ export function SendFile({
       {!file ? (
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="group relative border border-dashed border-white/10 hover:border-white/30 bg-dark-900/60 hover:bg-dark-800/80 rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 backdrop-blur-xl"
+          className="border border-dashed border-zinc-800 hover:border-zinc-600 bg-black rounded-md p-6 text-center cursor-pointer transition-colors group"
         >
-          <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 group-hover:border-white/20 transition-all duration-300">
-            <Upload size={20} className="text-white/70 group-hover:text-white" />
-          </div>
-          <p className="text-sm font-medium text-white/80 group-hover:text-white">
-            Select a file to transfer
+          <Upload size={18} className="mx-auto mb-2 text-zinc-500 group-hover:text-white transition-colors" />
+          <p className="text-xs font-medium text-zinc-300 group-hover:text-white">
+            Select or drop a file to transfer
           </p>
-          <p className="text-xs text-white/40 mt-1">
-            {connected
-              ? "P2P connection active • Ready for transfer"
-              : "Connect with a peer in the room first"}
+          <p className="text-[11px] font-mono text-zinc-600 mt-1">
+            Streamed directly over WebRTC P2P channel
           </p>
         </div>
       ) : (
-        <div className="bg-dark-900/80 border border-white/10 rounded-2xl p-5 backdrop-blur-xl space-y-4">
+        <div className="border border-zinc-800 bg-black rounded-md p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <FileUp size={18} className="text-white/80" />
-              </div>
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <FileUp size={16} className="text-zinc-400 shrink-0" />
               <div className="truncate">
-                <p className="text-sm font-medium text-white/90 truncate">
+                <p className="text-xs font-medium text-white truncate font-mono">
                   {file.name}
                 </p>
-                <p className="text-xs text-white/40">
+                <p className="text-[11px] font-mono text-zinc-500">
                   {(file.size / (1024 * 1024)).toFixed(2)} MB
                 </p>
               </div>
@@ -69,23 +67,23 @@ export function SendFile({
 
             <button
               onClick={() => onFileSelect(null)}
-              className="text-xs text-white/40 hover:text-white/80 px-2 py-1 transition-colors"
+              className="text-xs font-mono text-zinc-500 hover:text-white px-2 py-1 transition-colors cursor-pointer"
             >
-              Change
+              Clear
             </button>
           </div>
 
           {progress > 0 && (
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs text-white/60">
-                <span>Transfer progress</span>
-                <span className="font-mono">{progress}%</span>
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px] font-mono text-zinc-400">
+                <span>Progress</span>
+                <span>{progress}%</span>
               </div>
-              <div className="h-1.5 w-full bg-dark-700 rounded-full overflow-hidden">
+              <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
                 <motion.div
-                  className="h-full bg-gradient-to-r from-white/40 to-white"
+                  className="h-full bg-white"
                   style={{ width: `${progress}%` }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.15 }}
                 />
               </div>
             </div>
@@ -94,22 +92,22 @@ export function SendFile({
           <button
             onClick={onSend}
             disabled={!connected}
-            className="w-full relative group overflow-hidden bg-white disabled:bg-dark-700 text-black disabled:text-white/30 font-semibold text-sm py-3 px-6 rounded-xl hover:shadow-[0_0_25px_rgba(255,255,255,0.2)] disabled:hover:shadow-none transition-all duration-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-white text-black hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-500 font-medium text-sm py-2 px-4 rounded-md transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
           >
             {progress === 100 ? (
               <>
-                <CheckCircle2 size={16} className="text-success" />
-                Sent Successfully
+                <CheckCircle2 size={14} className="text-emerald-600" />
+                <span>Sent Successfully</span>
               </>
             ) : (
               <>
                 <span>Send File</span>
-                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                <ArrowRight size={14} />
               </>
             )}
           </button>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }
