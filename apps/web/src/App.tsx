@@ -12,55 +12,23 @@ import { useSignaling } from "./hooks/useSignaling";
 import { useWebRTC } from "./hooks/useWebRTC";
 
 export default function App() {
-    const [roomId, setRoomId] =
-        useState("9999");
+    const [roomId, setRoomId] = useState("9999");
 
-    const [name, setName] =
-        useState("Omkar");
+    const [name, setName] = useState("Omkar");
+  
+    const signaling = useSignaling();
+ 
+    const fileTransfer = useFileTransfer({  setStatus: signaling.setStatus, });
+ 
 
-    /*
-     * -----------------------------
-     * Signaling
-     * -----------------------------
-     */
+    const webRTC = useWebRTC({
+        
+            socketRef:  signaling.socketRef,
 
-    const signaling =
-        useSignaling();
+            setStatus:  signaling.setStatus,
 
-    /*
-     * -----------------------------
-     * File transfer
-     * -----------------------------
-     */
-
-    const fileTransfer =
-        useFileTransfer({
-            setStatus: signaling.setStatus,
-        });
-
-    /*
-     * -----------------------------
-     * WebRTC
-     * -----------------------------
-     */
-
-    const webRTC =
-        useWebRTC({
-            socketRef:
-                signaling.socketRef,
-
-            setStatus:
-                signaling.setStatus,
-
-            onMessage:
-                fileTransfer.receiveMessage,
-        });
-
-    /*
-     * -----------------------------
-     * UI
-     * -----------------------------
-     */
+            onMessage:  fileTransfer.receiveMessage,
+        }); 
 
     return (
         <main

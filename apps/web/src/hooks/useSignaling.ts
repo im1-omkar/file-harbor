@@ -22,38 +22,26 @@ import type {
     RoomUpdatedPayload,
 } from "../types/signaling";
 
-export function useSignaling() {
-    const socketRef =
-        useRef<Socket | null>(null);
+//create socket element using io.() -> write it's events -> create helper functions around it
+export function useSignaling() { 
 
-    const [socketId, setSocketId] =
-        useState("");
+    const socketRef = useRef<Socket | null>(null);
 
-    const [peers, setPeers] =
-        useState<Peer[]>([]);
+    const [socketId, setSocketId] = useState("");
 
-    const [currentRoom, setCurrentRoom] =
-        useState<string | null>(null);
+    const [peers, setPeers] =  useState<Peer[]>([]);
 
-    const [incomingRequest, setIncomingRequest] =
-        useState<ConnectionRequest | null>(
-            null,
-        );
+    const [currentRoom, setCurrentRoom] = useState<string | null>(null);
 
-    const [status, setStatus] =
-        useState("Not connected");
+    const [incomingRequest, setIncomingRequest] = useState<ConnectionRequest | null>( null, );
 
-    /*
-     * Establish Socket.IO connection.
-     */
+    const [status, setStatus] = useState("Not connected");
+
+     
     useEffect(() => {
         const socket = io(SERVER_URL);
 
         socketRef.current = socket;
-
-        // -----------------------------
-        // Connected
-        // -----------------------------
 
         socket.on("connect", () => {
             setSocketId(socket.id ?? "");
@@ -62,10 +50,6 @@ export function useSignaling() {
                 "Connected to signaling server",
             );
         });
-
-        // -----------------------------
-        // Disconnected
-        // -----------------------------
 
         socket.on("disconnect", () => {
             setStatus(
@@ -76,10 +60,7 @@ export function useSignaling() {
             setCurrentRoom(null);
             setIncomingRequest(null);
         });
-
-        // -----------------------------
-        // Room updated
-        // -----------------------------
+ 
 
         socket.on(
             "room-updated",
@@ -93,11 +74,7 @@ export function useSignaling() {
                     ),
                 );
             },
-        );
-
-        // -----------------------------
-        // Incoming connection request
-        // -----------------------------
+        ); 
 
         socket.on(
             "connection-request",
@@ -114,12 +91,8 @@ export function useSignaling() {
                     `Incoming connection request from ${peer.name}`,
                 );
             },
-        );
-
-        // -----------------------------
-        // Connection rejected
-        // -----------------------------
-
+        ); 
+         
         socket.on(
             "connection-rejected",
             () => {
@@ -127,11 +100,7 @@ export function useSignaling() {
                     "Connection request was rejected by peer",
                 );
             },
-        );
-
-        // -----------------------------
-        // Peer disconnected
-        // -----------------------------
+        );  
 
         socket.on(
             "peer-disconnected",
@@ -154,11 +123,7 @@ export function useSignaling() {
                         : prev,
                 );
             },
-        );
-
-        // -----------------------------
-        // Cleanup
-        // -----------------------------
+        );  
 
         return () => {
             socket.removeAllListeners();
@@ -170,9 +135,7 @@ export function useSignaling() {
         };
     }, []);
 
-    /*
-     * Join a signaling room.
-     */
+    
     const joinRoom = useCallback(
         (
             roomId: string,
@@ -224,9 +187,7 @@ export function useSignaling() {
         [],
     );
 
-    /*
-     * Leave current room.
-     */
+    
     const leaveRoom = useCallback(() => {
         const socket =
             socketRef.current;
@@ -244,9 +205,7 @@ export function useSignaling() {
         setStatus("Left room");
     }, []);
 
-    /*
-     * Ask another peer for a P2P connection.
-     */
+     
     const requestConnection = useCallback(
         (targetSocketId: string) => {
             socketRef.current?.emit(
@@ -271,11 +230,8 @@ export function useSignaling() {
             );
         },
         [],
-    );
-
-    /*
-     * Accept incoming connection request.
-     */
+    ); 
+   
     const acceptConnection = useCallback(
         () => {
             if (
@@ -311,10 +267,7 @@ export function useSignaling() {
         },
         [incomingRequest],
     );
-
-    /*
-     * Reject incoming connection request.
-     */
+ 
     const rejectConnection = useCallback(
         () => {
             if (

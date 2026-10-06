@@ -4,10 +4,7 @@ import {
     useState,
 } from "react";
 
-import {
-    BUFFER_LIMIT,
-    CHUNK_SIZE,
-} from "../config/constants";
+import { BUFFER_LIMIT,  CHUNK_SIZE, } from "../config/constants";
 
 import type { IncomingFile } from "../types/file";
 
@@ -18,39 +15,26 @@ interface UseFileTransferOptions {
 export function useFileTransfer({
     setStatus,
 }: UseFileTransferOptions) {
-    const [selectedFile, setSelectedFile] =
-        useState<File | null>(null);
+    const [selectedFile, setSelectedFile] =  useState<File | null>(null);
 
     const [progress, setProgress] = useState(0);
 
-    const incomingFile =
-        useRef<IncomingFile | null>(null);
+    const incomingFile = useRef<IncomingFile | null>(null);
 
-    const receivedChunks =
-        useRef<BlobPart[]>([]);
+    const receivedChunks =  useRef<BlobPart[]>([]);
 
-    const receivedBytes =
-        useRef(0);
+    const receivedBytes =  useRef(0);
 
-    /*
-     * Handles both:
-     * - JSON control messages
-     * - binary file chunks
-     */
+ 
     const receiveMessage = useCallback(
         (data: string | ArrayBuffer) => {
-            // -----------------------------
-            // JSON/control message
-            // -----------------------------
+ 
 
             if (typeof data === "string") {
                 try {
                     const message = JSON.parse(data);
 
-                    // -------------------------
-                    // File started
-                    // -------------------------
-
+                  
                     if (message.type === "file-start") {
                         incomingFile.current = {
                             name: message.name,
@@ -67,14 +51,10 @@ export function useFileTransfer({
                             `Receiving ${message.name}...`,
                         );
                     }
-
-                    // -------------------------
-                    // File ended
-                    // -------------------------
+ 
 
                     if (message.type === "file-end") {
-                        const fileInfo =
-                            incomingFile.current;
+                        const fileInfo = incomingFile.current;
 
                         if (!fileInfo) {
                             return;
@@ -100,11 +80,9 @@ export function useFileTransfer({
                             },
                         );
 
-                        const url =
-                            URL.createObjectURL(blob);
+                        const url = URL.createObjectURL(blob);
 
-                        const anchor =
-                            document.createElement("a");
+                        const anchor = document.createElement("a");
 
                         anchor.href = url;
                         anchor.download = fileInfo.name;
@@ -126,18 +104,11 @@ export function useFileTransfer({
                         setProgress(100);
                     }
                 } catch (error) {
-                    console.error(
-                        "Failed to parse data channel message:",
-                        error,
-                    );
+                    console.error( "Failed to parse data channel message:", error, );
                 }
 
                 return;
             }
-
-            // -----------------------------
-            // Binary file chunk
-            // -----------------------------
 
             const fileInfo =
                 incomingFile.current;
@@ -152,8 +123,7 @@ export function useFileTransfer({
                 data.byteLength;
 
             setProgress(
-                Math.min(
-                    100,
+                Math.min(  100,
                     Math.round(
                         (receivedBytes.current /
                             fileInfo.size) *
@@ -164,14 +134,7 @@ export function useFileTransfer({
         },
         [setStatus],
     );
-
-    /*
-     * Backpressure handling.
-     *
-     * RTCDataChannel has a send buffer.
-     * We don't want to dump the entire file
-     * into it at once.
-     */
+   
     const waitForBufferDrain = useCallback(
         (dc: RTCDataChannel): Promise<void> => {
             if (dc.readyState !== "open") {
@@ -246,10 +209,7 @@ export function useFileTransfer({
                         "error",
                         onError,
                     );
-
-                    // Handle race condition where the
-                    // buffer drained before listeners
-                    // were attached.
+ 
                     if (
                         dc.bufferedAmount <=
                         BUFFER_LIMIT
@@ -261,11 +221,7 @@ export function useFileTransfer({
         },
         [],
     );
-
-    /*
-     * Sends a file over an already-established
-     * RTCDataChannel.
-     */
+ 
     const sendFile = useCallback(
         async (dc: RTCDataChannel | null) => {
             if (

@@ -35,53 +35,32 @@ export function useWebRTC({
     setStatus,
     onMessage,
 }: UseWebRTCOptions) {
-    const pcRef =
-        useRef<RTCPeerConnection | null>(
-            null,
-        );
+    const pcRef = useRef<RTCPeerConnection | null>(  null,  );
 
-    const dcRef =
-        useRef<RTCDataChannel | null>(null);
+    const dcRef = useRef<RTCDataChannel | null>(null);
 
-    const targetRef =
-        useRef<string | null>(null);
+    const targetRef = useRef<string | null>(null);
 
-    const pendingCandidates =
-        useRef<RTCIceCandidateInit[]>([]);
+    const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
 
-    const [connected, setConnected] =
-        useState(false);
+    const [connected, setConnected] = useState(false);
 
-    /*
-     * Keep the latest message handler without
-     * forcing WebRTC event listeners to be
-     * recreated whenever React re-renders.
-     */
-    const onMessageRef =
-        useRef(onMessage);
+   
+    const onMessageRef = useRef(onMessage);
 
     useEffect(() => {
-        onMessageRef.current =
-            onMessage;
+        onMessageRef.current = onMessage;
     }, [onMessage]);
 
-    /*
-     * Same idea for status updates.
-     */
-    const setStatusRef =
-        useRef(setStatus);
+  
+    const setStatusRef =  useRef(setStatus);
 
-    useEffect(() => {
-        setStatusRef.current =
-            setStatus;
-    }, [setStatus]);
+    useEffect(() => { 
+        setStatusRef.current = setStatus; 
+    },  [setStatus]);
 
-    /*
-     * Close and completely reset current
-     * P2P connection.
-     */
-    const closePeerConnection =
-        useCallback(() => {
+   
+    const closePeerConnection = useCallback(() => {
             dcRef.current?.close();
 
             pcRef.current?.close();
@@ -96,10 +75,7 @@ export function useWebRTC({
             setConnected(false);
         }, []);
 
-    /*
-     * Add ICE candidates that arrived before
-     * remoteDescription was available.
-     */
+   
     const flushPendingCandidates =
         useCallback(
             async (
@@ -128,18 +104,14 @@ export function useWebRTC({
             [],
         );
 
-    /*
-     * Configure a DataChannel.
-     */
-    const setupDataChannel =
-        useCallback(
+  
+    const setupDataChannel = useCallback(
             (dc: RTCDataChannel) => {
                 dcRef.current = dc;
 
                 dc.binaryType = "arraybuffer";
 
-                dc.bufferedAmountLowThreshold =
-                    BUFFER_LIMIT / 2;
+                dc.bufferedAmountLowThreshold =  BUFFER_LIMIT / 2;
 
                 // -------------------------
                 // Open
@@ -193,9 +165,7 @@ export function useWebRTC({
             [],
         );
 
-    /*
-     * Create RTCPeerConnection.
-     */
+    
     const createPeerConnection =
         useCallback(
             (
@@ -207,25 +177,17 @@ export function useWebRTC({
                  * a new PC while handling an incoming
                  * offer.
                  */
-                const queuedCandidates =
-                    preservePendingCandidates
-                        ? pendingCandidates.current
-                        : [];
+                const queuedCandidates = preservePendingCandidates ? pendingCandidates.current : [];
 
                 closePeerConnection();
 
-                pendingCandidates.current =
-                    queuedCandidates;
+                pendingCandidates.current = queuedCandidates;
 
-                const pc =
-                    new RTCPeerConnection(
-                        ICE_SERVERS,
-                    );
+                const pc = new RTCPeerConnection( ICE_SERVERS, );
 
                 pcRef.current = pc;
 
-                targetRef.current =
-                    targetSocketId;
+                targetRef.current = targetSocketId;
 
                 /*
                  * Local ICE candidate generated.
@@ -248,8 +210,7 @@ export function useWebRTC({
                 /*
                  * Monitor WebRTC connection.
                  */
-                pc.onconnectionstatechange =
-                    () => {
+                pc.onconnectionstatechange = () => {
                         console.log(
                             "WebRTC state:",
                             pc.connectionState,
@@ -284,27 +245,15 @@ export function useWebRTC({
             ],
         );
 
-    /*
-     * Socket.IO WebRTC signaling listeners.
-     */
+    
     useEffect(() => {
-        const socket =
-            socketRef.current;
+        const socket =  socketRef.current;
 
         if (!socket) {
             return;
         }
-
-        // =================================
-        // Connection accepted
-        // =================================
-
-        const handleConnectionAccepted =
-            async ({
-                from,
-            }: {
-                from: string;
-            }) => {
+ 
+        const handleConnectionAccepted = async ({  from, }: { from: string; }) => {
                 targetRef.current = from;
 
                 try {
@@ -360,10 +309,7 @@ export function useWebRTC({
                 }
             };
 
-        // =================================
-        // Incoming offer
-        // =================================
-
+     
         const handleOffer = async ({
             from,
             offer,
@@ -442,10 +388,7 @@ export function useWebRTC({
             }
         };
 
-        // =================================
-        // Incoming answer
-        // =================================
-
+ 
         const handleAnswer = async ({
             answer,
         }: WebRTCAnswerPayload) => {
@@ -479,10 +422,7 @@ export function useWebRTC({
             }
         };
 
-        // =================================
-        // Incoming ICE candidate
-        // =================================
-
+         
         const handleIceCandidate =
             async ({
                 candidate,
@@ -518,17 +458,8 @@ export function useWebRTC({
                     );
                 }
             };
-
-        // =================================
-        // Peer disconnected
-        // =================================
-
-        const handlePeerDisconnected =
-            ({
-                socketId: disconnectedId,
-            }: {
-                socketId: string;
-            }) => {
+ 
+        const handlePeerDisconnected = ({  socketId: disconnectedId, }: {  socketId: string; }) => {
                 if (
                     targetRef.current ===
                     disconnectedId
@@ -541,9 +472,7 @@ export function useWebRTC({
                 }
             };
 
-        // =================================
-        // Register
-        // =================================
+        
 
         socket.on(
             "connection-accepted",
@@ -569,10 +498,7 @@ export function useWebRTC({
             "peer-disconnected",
             handlePeerDisconnected,
         );
-
-        // =================================
-        // Cleanup
-        // =================================
+ 
 
         return () => {
             socket.off(
