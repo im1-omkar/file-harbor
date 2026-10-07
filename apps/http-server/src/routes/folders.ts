@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, type AuthenticatedRequest } from "../middleware/auth.js";
-import { deleteR2Object } from "../lib/r2.js";
+import { deleteStorageObject } from "../lib/storage.js";
 
 export const folderRouter = Router();
 
@@ -160,7 +160,7 @@ folderRouter.delete("/:id", async (req: AuthenticatedRequest, res) => {
 
     let freedBytes = 0n;
     for (const file of filesToDelete) {
-      await deleteR2Object(file.objectKey);
+      await deleteStorageObject(file.objectKey);
       freedBytes += file.size;
     }
 

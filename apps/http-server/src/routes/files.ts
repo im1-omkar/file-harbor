@@ -5,9 +5,9 @@ import { requireAuth, type AuthenticatedRequest } from "../middleware/auth.js";
 import {
   generatePresignedUploadUrl,
   generatePresignedDownloadUrl,
-  verifyR2Object,
-  deleteR2Object,
-} from "../lib/r2.js";
+  verifyStorageObject,
+  deleteStorageObject,
+} from "../lib/storage.js";
 
 export const fileRouter = Router();
 
@@ -22,7 +22,7 @@ const uploadUrlSchema = z.object({
 
 /**
  * POST /api/files/upload-url
- * Generate short-lived presigned R2 PUT URL for direct browser upload
+ * Generate short-lived presigned Supabase PUT URL for direct browser upload
  */
 fileRouter.post("/upload-url", async (req: AuthenticatedRequest, res) => {
   try {
@@ -89,7 +89,7 @@ fileRouter.post("/upload-url", async (req: AuthenticatedRequest, res) => {
 
 /**
  * POST /api/files/:id/complete
- * Verify object on R2 using HeadObject, compare size, mark READY, update storageUsed
+ * Verify object on Supabase Storage using HeadObject, compare size, mark READY, update storageUsed
  */
 fileRouter.post("/:id/complete", async (req: AuthenticatedRequest, res) => {
   try {
@@ -105,18 +105,18 @@ fileRouter.post("/:id/complete", async (req: AuthenticatedRequest, res) => {
       return;
     }
 
-    const r2Result = await verifyR2Object(file.objectKey);
+    const storageResult = await verifyStorageObject(file.objectKey);
 
-    if (!r2Result.exists) {
+    if (!storageResult.exists) {
       await prisma.file.update({
         where: { id },
         data: { status: "FAILED" },
       });
-      res.status(400).json({ error: "File object not found on R2 storage" });
+      res.status(400).json({ error: "File object not found on Supabase storage" });
       return;
     }
 
-    const actualSize = r2Result.size > 0n ? r2Result.size : file.size;
+    const actualSize = storageResult.size > 0n ? storageResult.size : file.size;
 
     const updatedFile = await prisma.$transaction(async (tx) => {
       const updated = await tx.file.update({
@@ -194,7 +194,7 @@ fileRouter.get("/", async (req: AuthenticatedRequest, res) => {
 
 /**
  * GET /api/files/:id/download
- * Generate presigned R2 GET URL
+ * Generate presigned Supabase GET URL
  */
 fileRouter.get("/:id/download", async (req: AuthenticatedRequest, res) => {
   try {
@@ -224,7 +224,7 @@ fileRouter.get("/:id/download", async (req: AuthenticatedRequest, res) => {
 
 /**
  * DELETE /api/files/:id
- * Delete object from R2, decrement storageUsed, remove DB record
+ * Delete object from Supabase Storage, decrement storageUsed, remove DB record
  */
 fileRouter.delete("/:id", async (req: AuthenticatedRequest, res) => {
   try {
@@ -240,7 +240,7 @@ fileRouter.delete("/:id", async (req: AuthenticatedRequest, res) => {
       return;
     }
 
-    await deleteR2Object(file.objectKey);
+    await deleteStorageObject(file.objectKey);
 
     await prisma.$transaction(async (tx) => {
       await tx.file.delete({ where: { id } });

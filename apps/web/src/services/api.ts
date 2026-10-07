@@ -132,7 +132,7 @@ export const api = {
     );
   },
 
-  async uploadFileToR2(uploadUrl: string, file: File) {
+  async uploadFileToStorage(uploadUrl: string, file: File) {
     const res = await fetch(uploadUrl, {
       method: "PUT",
       headers: {
@@ -141,8 +141,13 @@ export const api = {
       body: file,
     });
     if (!res.ok) {
-      throw new Error(`Failed to upload file to R2: ${res.statusText}`);
+      throw new Error(`Failed to upload file to storage: ${res.statusText}`);
     }
+  },
+
+  // Alias for backward compatibility
+  async uploadFileToR2(uploadUrl: string, file: File) {
+    return this.uploadFileToStorage(uploadUrl, file);
   },
 
   async completeFileUpload(fileId: string) {

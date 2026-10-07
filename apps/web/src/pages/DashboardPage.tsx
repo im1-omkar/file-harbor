@@ -58,7 +58,7 @@ export function DashboardPage({
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
 
-  // R2 Direct Upload State
+  // Direct Storage Upload State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -115,7 +115,7 @@ export function DashboardPage({
     }
   }
 
-  async function handleDirectR2Upload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleDirectUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
@@ -133,9 +133,9 @@ export function DashboardPage({
         folderId: currentFolderId,
       });
 
-      // 2. Direct browser upload to R2
+      // 2. Direct browser upload to Supabase Storage
       setUploadProgress(50);
-      await api.uploadFileToR2(uploadUrl, selectedFile);
+      await api.uploadFileToStorage(uploadUrl, selectedFile);
 
       // 3. Confirm completion with Express (triggers HeadObject & quota update)
       setUploadProgress(85);
@@ -251,7 +251,7 @@ export function DashboardPage({
                 Cloud Storage Workspace
               </h2>
               <p className="text-xs font-mono text-zinc-400 mt-0.5">
-                Encrypted direct object storage powered by Cloudflare R2
+                Encrypted direct object storage powered by Supabase
               </p>
             </div>
 
@@ -317,7 +317,7 @@ export function DashboardPage({
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                onChange={handleDirectR2Upload}
+                onChange={handleDirectUpload}
               />
 
               <button
@@ -439,7 +439,7 @@ export function DashboardPage({
                       <button
                         onClick={() => handleDownload(file.id)}
                         className="text-zinc-400 hover:text-white p-1 transition-colors cursor-pointer"
-                        title="Download File (R2 Presigned GET)"
+                        title="Download File (Supabase Presigned GET)"
                       >
                         <Download size={14} />
                       </button>
@@ -460,7 +460,7 @@ export function DashboardPage({
 
         {/* Footer */}
         <footer className="py-4 border-t border-zinc-800 text-center text-[11px] text-zinc-500 font-mono">
-          File Harbor • Direct Browser-to-Cloudflare R2 Encrypted Storage
+          File Harbor • Direct Browser-to-Supabase Storage Encrypted Cloud Storage
         </footer>
       </div>
     </div>

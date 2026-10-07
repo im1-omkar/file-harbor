@@ -135,7 +135,7 @@ export function PublicLandingPage({ user, onAuthSuccess }: PublicLandingPageProp
                 Need persistent Cloud Storage?
               </p>
               <p className="text-[11px] font-mono text-zinc-400">
-                Sign in to unlock 5 GiB free Cloudflare R2 direct file storage with nested folders.
+                Sign in to unlock 5 GiB free Supabase direct cloud storage with nested folders.
               </p>
             </div>
           </div>

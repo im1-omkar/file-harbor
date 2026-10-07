@@ -8,6 +8,7 @@ import { folderRouter } from "./routes/folders.js";
 import { fileRouter } from "./routes/files.js";
 
 dotenv.config();
+dotenv.config({ path: "../../.env" });
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
