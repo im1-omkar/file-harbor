@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import {
   FolderPlus,
   Upload,
@@ -27,6 +27,7 @@ import {
   type FileItem,
 } from "../services/api";
 import { LogoMark } from "../components/LogoMark";
+import { FileViewerModal } from "../components/FileViewerModal";
 
 interface DashboardPageProps {
   user: UserProfile | null;
@@ -57,9 +58,11 @@ export function DashboardPage({
   onUserUpdate,
 }: DashboardPageProps) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Cloud Storage State
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const folderIdParam = searchParams.get("folderId");
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(folderIdParam);
   const [folderPath, setFolderPath] = useState<{ id: string | null; name: string }[]>([
     { id: null, name: "My Drive" },
   ]);
@@ -71,6 +74,8 @@ export function DashboardPage({
   // UI State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [viewingFile, setViewingFile] = useState<FileItem | null>(null);
   
   // New Folder Modal
   const [newFolderOpen, setNewFolderOpen] = useState(false);
@@ -215,13 +220,30 @@ export function DashboardPage({
   function navigateToFolder(folder: FolderItem) {
     setCurrentFolderId(folder.id);
     setFolderPath((prev) => [...prev, { id: folder.id, name: folder.name }]);
+    setSearchParams({ folderId: folder.id });
   }
 
   function navigateToBreadcrumb(index: number) {
     const target = folderPath[index];
     setCurrentFolderId(target.id);
     setFolderPath(folderPath.slice(0, index + 1));
+    if (target.id) {
+      setSearchParams({ folderId: target.id });
+    } else {
+      setSearchParams({});
+    }
   }
+
+  useEffect(() => {
+    if (folderIdParam !== currentFolderId) {
+      setCurrentFolderId(folderIdParam);
+      // We don't fetch full folder path here to keep it simple, 
+      // but in a real app we would fetch breadcrumbs from server.
+      if (!folderIdParam) {
+        setFolderPath([{ id: null, name: "My Drive" }]);
+      }
+    }
+  }, [folderIdParam]);
 
   if (!user) return null;
 
@@ -283,6 +305,7 @@ export function DashboardPage({
             onClick={() => {
               setCurrentFolderId(null);
               setFolderPath([{ id: null, name: "My Drive" }]);
+              setSearchParams({});
             }}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-full text-sm font-medium transition-colors ${!currentFolderId ? 'bg-[#c2e7ff] text-[#001d35]' : 'text-[#e3e3e3] hover:bg-[#333537]'}`}
           >
@@ -341,17 +364,43 @@ export function DashboardPage({
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex flex-col items-end mr-2">
-              <span className="text-sm font-medium text-white leading-tight">{user.name}</span>
-              <span className="text-xs text-[#c4c7c5]">{user.email}</span>
+            {/* Profile Dropdown Container */}
+            <div className="relative">
+              <button
+                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                className="flex items-center gap-2 hover:bg-[#333537] p-1 pr-3 rounded-full transition-colors cursor-pointer select-none"
+              >
+                <div className="w-8 h-8 rounded-full bg-[#a8c7fa] text-[#001d35] flex items-center justify-center font-bold text-sm">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="hidden sm:flex flex-col items-start">
+                  <span className="text-sm font-medium text-white leading-tight">{user.name}</span>
+                </div>
+              </button>
+
+              {/* Profile Dropdown Menu */}
+              {profileMenuOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setProfileMenuOpen(false)}
+                  ></div>
+                  <div className="absolute right-0 mt-2 w-64 bg-[#282a2c] border border-[#333537] rounded-2xl shadow-xl py-3 z-50 overflow-hidden">
+                    <div className="px-5 py-3 border-b border-[#333537] mb-2">
+                      <p className="text-sm font-medium text-white">{user.name}</p>
+                      <p className="text-xs text-[#c4c7c5] mt-1">{user.email}</p>
+                    </div>
+                    <button
+                      onClick={onSignOut}
+                      className="w-full flex items-center gap-3 px-5 py-2.5 text-sm text-[#e3e3e3] hover:bg-[#333537] transition-colors cursor-pointer"
+                    >
+                      <LogOut size={18} />
+                      Sign out
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
-            <button
-              onClick={onSignOut}
-              className="p-2 text-[#e3e3e3] hover:bg-[#333537] rounded-full transition-colors cursor-pointer"
-              title="Sign Out"
-            >
-              <LogOut size={20} />
-            </button>
           </div>
         </header>
 
@@ -514,7 +563,8 @@ export function DashboardPage({
                           return (
                             <div
                               key={file.id}
-                              className="grid grid-cols-12 px-4 py-3 items-center hover:bg-[#333537]/50 transition-colors group cursor-default"
+                              onClick={() => setViewingFile(file)}
+                              className="grid grid-cols-12 px-4 py-3 items-center hover:bg-[#333537]/50 transition-colors group cursor-pointer"
                             >
                               <div className="col-span-7 sm:col-span-8 flex items-center gap-3 truncate pr-4">
                                 <Icon size={20} className="text-[#a8c7fa] shrink-0" />
@@ -527,14 +577,20 @@ export function DashboardPage({
                               
                               <div className="col-span-2 sm:col-span-2 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
-                                  onClick={() => handleDownload(file.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownload(file.id);
+                                  }}
                                   className="p-2 text-[#c4c7c5] hover:text-[#e3e3e3] hover:bg-[#282a2c] rounded-full transition-colors"
                                   title="Download"
                                 >
                                   <Download size={18} />
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteFile(file.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteFile(file.id);
+                                  }}
                                   className="p-2 text-[#c4c7c5] hover:text-red-400 hover:bg-[#282a2c] rounded-full transition-colors"
                                   title="Delete"
                                 >
@@ -560,6 +616,15 @@ export function DashboardPage({
         <div 
           className="md:hidden fixed inset-0 bg-black/50 z-30"
           onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* File Viewer Modal */}
+      {viewingFile && (
+        <FileViewerModal
+          file={viewingFile}
+          onClose={() => setViewingFile(null)}
+          onDownload={handleDownload}
         />
       )}
     </div>
