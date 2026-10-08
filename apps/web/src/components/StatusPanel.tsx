@@ -6,8 +6,8 @@ interface StatusPanelProps {
 
 export function StatusPanel({ status, socketId, currentRoom }: StatusPanelProps) {
   return (
-    <div className="fixed top-4 left-4 z-50 font-mono text-[11px] leading-tight space-y-1 select-none">
-      <div className="flex items-center gap-2">
+    <div className="fixed bottom-6 left-6 z-50 font-mono text-xs leading-relaxed space-y-1 select-none bg-black/60 p-4 rounded-xl border border-white/10 backdrop-blur-md shadow-2xl">
+      <div className="flex items-center gap-2 mb-2">
         <span
           className={`w-2 h-2 rounded-full ${
             socketId ? "bg-emerald-500" : "bg-red-500"

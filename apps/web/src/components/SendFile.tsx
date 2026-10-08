@@ -20,12 +20,12 @@ export function SendFile({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="w-full space-y-3">
+    <div className="w-full space-y-4">
       <div className="flex items-center justify-between">
-        <label className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+        <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">
           File Transfer
         </label>
-        <span className="text-[11px] font-mono text-zinc-500">
+        <span className="text-xs font-mono text-zinc-500">
           {connected ? "Peer Connected" : "No Active Peer"}
         </span>
       </div>
@@ -40,26 +40,26 @@ export function SendFile({
       {!file ? (
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="border border-dashed border-zinc-800 hover:border-zinc-600 bg-black rounded-md p-6 text-center cursor-pointer transition-colors group"
+          className="border border-dashed border-zinc-700 hover:border-zinc-500 bg-black rounded-lg p-8 text-center cursor-pointer transition-colors group"
         >
-          <Upload size={18} className="mx-auto mb-2 text-zinc-500 group-hover:text-white transition-colors" />
-          <p className="text-xs font-medium text-zinc-300 group-hover:text-white">
+          <Upload size={24} className="mx-auto mb-3 text-zinc-500 group-hover:text-white transition-colors" />
+          <p className="text-sm font-medium text-zinc-300 group-hover:text-white mb-1.5">
             Select or drop a file to transfer
           </p>
-          <p className="text-[11px] font-mono text-zinc-600 mt-1">
+          <p className="text-xs font-mono text-zinc-500">
             Streamed directly over WebRTC P2P channel
           </p>
         </div>
       ) : (
-        <div className="border border-zinc-800 bg-black rounded-md p-4 space-y-3">
+        <div className="border border-zinc-700 bg-black rounded-lg p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <FileUp size={16} className="text-zinc-400 shrink-0" />
+            <div className="flex items-center gap-3 overflow-hidden">
+              <FileUp size={20} className="text-zinc-400 shrink-0" />
               <div className="truncate">
-                <p className="text-xs font-medium text-white truncate font-mono">
+                <p className="text-sm font-medium text-white truncate font-mono">
                   {file.name}
                 </p>
-                <p className="text-[11px] font-mono text-zinc-500">
+                <p className="text-xs font-mono text-zinc-400 mt-0.5">
                   {(file.size / (1024 * 1024)).toFixed(2)} MB
                 </p>
               </div>
@@ -67,19 +67,19 @@ export function SendFile({
 
             <button
               onClick={() => onFileSelect(null)}
-              className="text-xs font-mono text-zinc-500 hover:text-white px-2 py-1 transition-colors cursor-pointer"
+              className="text-sm font-mono text-zinc-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-zinc-800 transition-colors cursor-pointer"
             >
               Clear
             </button>
           </div>
 
           {progress > 0 && (
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px] font-mono text-zinc-400">
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-mono text-zinc-400">
                 <span>Progress</span>
                 <span>{progress}%</span>
               </div>
-              <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
+              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-white"
                   style={{ width: `${progress}%` }}
@@ -92,17 +92,17 @@ export function SendFile({
           <button
             onClick={onSend}
             disabled={!connected}
-            className="w-full bg-white text-black hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-500 font-medium text-sm py-2 px-4 rounded-md transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+            className="w-full bg-white text-black hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-500 font-medium text-sm py-2.5 px-4 rounded-md transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
           >
             {progress === 100 ? (
               <>
-                <CheckCircle2 size={14} className="text-emerald-600" />
+                <CheckCircle2 size={16} className="text-emerald-600" />
                 <span>Sent Successfully</span>
               </>
             ) : (
               <>
                 <span>Send File</span>
-                <ArrowRight size={14} />
+                <ArrowRight size={16} />
               </>
             )}
           </button>

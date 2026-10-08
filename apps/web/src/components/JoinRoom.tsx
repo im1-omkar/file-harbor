@@ -21,14 +21,14 @@ export function JoinRoom({
   onLeave,
 }: Props) {
   return (
-    <div className="w-full space-y-3">
+    <div className="w-full space-y-4">
       <div className="flex items-center justify-between">
-        <label className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+        <label className="text-xs font-mono uppercase tracking-wider text-zinc-400">
           Room Session
         </label>
         {currentRoom && (
-          <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-mono text-emerald-400 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             Connected to {currentRoom}
           </span>
         )}
@@ -41,29 +41,29 @@ export function JoinRoom({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="space-y-3"
+            className="space-y-4"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <input
                 value={name}
                 onChange={(e) => onNameChange(e.target.value)}
                 placeholder="Your name"
-                className="sm:col-span-2 bg-black border border-zinc-800 rounded-md px-3 py-2 text-sm text-white placeholder-zinc-600 font-mono transition-colors"
+                className="sm:col-span-2 bg-black border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-zinc-500 font-mono transition-colors focus:border-zinc-500 outline-none"
               />
               <input
                 value={roomId}
                 onChange={(e) => onRoomIdChange(e.target.value)}
                 placeholder="Room ID"
-                className="bg-black border border-zinc-800 rounded-md px-3 py-2 text-sm text-white placeholder-zinc-600 font-mono transition-colors"
+                className="bg-black border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-zinc-500 font-mono transition-colors focus:border-zinc-500 outline-none"
               />
             </div>
 
             <button
               onClick={onJoin}
-              className="w-full bg-white text-black font-medium text-sm py-2 px-4 rounded-md hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full bg-white text-black font-medium text-sm py-2.5 px-4 rounded-lg hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>Join Room</span>
-              <ArrowRight size={14} />
+              <ArrowRight size={16} />
             </button>
           </motion.div>
         ) : (
@@ -75,9 +75,9 @@ export function JoinRoom({
           >
             <button
               onClick={onLeave}
-              className="w-full bg-black border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white font-medium text-sm py-2 px-4 rounded-md transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full bg-black border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white font-medium text-sm py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
-              <LogOut size={14} />
+              <LogOut size={16} />
               <span>Leave Room</span>
             </button>
           </motion.div>

@@ -9,10 +9,16 @@ import {
   Trash2,
   ChevronRight,
   LogOut,
-  HardDrive,
   RefreshCw,
   X,
   Radio,
+  Plus,
+  Search,
+  Menu,
+  Image as ImageIcon,
+  FileCode,
+  FileArchive,
+  Cloud,
 } from "lucide-react";
 import {
   api,
@@ -37,6 +43,14 @@ function formatBytes(bytesStr: string | number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
+function getFileIcon(name: string) {
+  const ext = name.split('.').pop()?.toLowerCase();
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext || '')) return ImageIcon;
+  if (['zip', 'tar', 'gz', 'rar', '7z'].includes(ext || '')) return FileArchive;
+  if (['js', 'ts', 'jsx', 'tsx', 'html', 'css', 'json', 'py', 'rs', 'go'].includes(ext || '')) return FileCode;
+  return FileText;
+}
+
 export function DashboardPage({
   user,
   onSignOut,
@@ -47,13 +61,17 @@ export function DashboardPage({
   // Cloud Storage State
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderPath, setFolderPath] = useState<{ id: string | null; name: string }[]>([
-    { id: null, name: "Root" },
+    { id: null, name: "My Drive" },
   ]);
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // UI State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
+  
   // New Folder Modal
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -74,6 +92,17 @@ export function DashboardPage({
       loadStorageContent(currentFolderId);
     }
   }, [currentFolderId, user?.id]);
+
+  // Click outside to close menus
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!(e.target as Element).closest('.new-menu-container')) {
+        setIsNewMenuOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   async function loadStorageContent(folderId: string | null) {
     setLoading(true);
@@ -109,6 +138,7 @@ export function DashboardPage({
       await api.createFolder(newFolderName.trim(), currentFolderId);
       setNewFolderName("");
       setNewFolderOpen(false);
+      setIsNewMenuOpen(false);
       loadStorageContent(currentFolderId);
     } catch (err: any) {
       setError(err.message || "Failed to create folder");
@@ -119,12 +149,12 @@ export function DashboardPage({
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
+    setIsNewMenuOpen(false);
     setUploading(true);
     setUploadProgress(10);
     setError(null);
 
     try {
-      // 1. Request presigned upload URL from Express
       setUploadProgress(25);
       const { fileId, uploadUrl } = await api.getUploadUrl({
         name: selectedFile.name,
@@ -133,11 +163,9 @@ export function DashboardPage({
         folderId: currentFolderId,
       });
 
-      // 2. Direct browser upload to Supabase Storage
       setUploadProgress(50);
       await api.uploadFileToStorage(uploadUrl, selectedFile);
 
-      // 3. Confirm completion with Express (triggers HeadObject & quota update)
       setUploadProgress(85);
       await api.completeFileUpload(fileId);
 
@@ -202,267 +230,338 @@ export function DashboardPage({
   const storagePercent = Math.min(100, Math.round((storageUsedNum / storageLimitNum) * 100));
 
   return (
-    <div className="relative min-h-screen bg-black text-fafafa font-sans selection:bg-white selection:text-black">
-      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-6 min-h-screen flex flex-col justify-between">
-        {/* Top Header */}
-        <header className="flex items-center justify-between pt-2 pb-6 border-b border-zinc-800">
-          {/* Logo & Title */}
-          <Link to="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
-            <LogoMark size={20} className="text-white" />
-            <span className="text-base font-semibold tracking-tight text-white">
-              File Harbor
-            </span>
-            <span className="text-xs font-mono text-zinc-500 border border-zinc-800 rounded px-1.5 py-0.5 ml-1">
-              Cloud
-            </span>
+    <div className="flex h-screen bg-[#131314] text-[#e3e3e3] font-sans overflow-hidden selection:bg-[#a8c7fa]/30 selection:text-white">
+      
+      {/* Sidebar */}
+      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-[#131314] border-r border-[#333537] transform transition-transform duration-300 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}>
+        <div className="h-16 flex items-center px-6">
+          <Link to="/" className="flex items-center gap-2">
+            <LogoMark size={24} className="text-[#e3e3e3]" />
+            <span className="text-[22px] font-medium tracking-tight text-white">File Harbor</span>
           </Link>
+        </div>
 
-          {/* User Profile & Navigation */}
-          <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              className="hidden sm:flex items-center gap-1.5 text-xs font-mono text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 px-3 py-1.5 rounded-md transition-colors"
-            >
-              <Radio size={12} />
-              <span>P2P Transfer</span>
-            </Link>
+        <div className="px-4 py-2 relative new-menu-container">
+          <button 
+            onClick={() => setIsNewMenuOpen(!isNewMenuOpen)}
+            className="flex items-center gap-3 bg-[#c2e7ff] text-[#001d35] hover:bg-[#a8c7fa] hover:shadow-md transition-all px-4 py-3 rounded-2xl font-medium w-[120px]"
+          >
+            <Plus size={20} />
+            <span>New</span>
+          </button>
 
-            <div className="text-right hidden sm:block">
-              <p className="text-xs font-semibold text-white">{user.name}</p>
-              <p className="text-[10px] font-mono text-zinc-500">{user.email}</p>
+          {/* New Dropdown */}
+          {isNewMenuOpen && (
+            <div className="absolute top-16 left-4 w-48 bg-[#282a2c] border border-[#333537] rounded-lg shadow-xl py-2 z-50">
+              <button 
+                onClick={() => {
+                  setNewFolderOpen(true);
+                  setIsNewMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-[#e3e3e3] hover:bg-[#333537] transition-colors"
+              >
+                <FolderPlus size={18} className="text-[#e3e3e3]" />
+                <span>New folder</span>
+              </button>
+              <div className="h-px bg-[#333537] my-2"></div>
+              <button 
+                onClick={() => {
+                  fileInputRef.current?.click();
+                  setIsNewMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-[#e3e3e3] hover:bg-[#333537] transition-colors"
+              >
+                <Upload size={18} className="text-[#e3e3e3]" />
+                <span>File upload</span>
+              </button>
             </div>
+          )}
+        </div>
 
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <button 
+            onClick={() => {
+              setCurrentFolderId(null);
+              setFolderPath([{ id: null, name: "My Drive" }]);
+            }}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-full text-sm font-medium transition-colors ${!currentFolderId ? 'bg-[#c2e7ff] text-[#001d35]' : 'text-[#e3e3e3] hover:bg-[#333537]'}`}
+          >
+            <Cloud size={20} />
+            My Drive
+          </button>
+          
+          <Link 
+            to="/" 
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-full text-sm font-medium text-[#e3e3e3] hover:bg-[#333537] transition-colors"
+          >
+            <Radio size={20} />
+            P2P Transfer
+          </Link>
+        </nav>
+
+        <div className="p-4 mx-3 mb-4 rounded-xl space-y-3">
+          <div className="flex items-center gap-3 text-sm text-[#e3e3e3]">
+            <Cloud size={20} className="text-[#c4c7c5]" />
+            <span>Storage</span>
+          </div>
+          <div className="space-y-1.5">
+            <div className="h-1.5 w-full bg-[#333537] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#c2e7ff] rounded-full transition-all duration-300"
+                style={{ width: `${storagePercent}%` }}
+              />
+            </div>
+            <p className="text-xs text-[#c4c7c5]">
+              {formatBytes(user.storageUsed)} of {formatBytes(user.storageLimit)} used
+            </p>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-screen min-w-0 bg-[#131314]">
+        
+        {/* Header */}
+        <header className="h-16 px-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="md:hidden p-2 text-[#e3e3e3] hover:bg-[#333537] rounded-full"
+            >
+              <Menu size={24} />
+            </button>
+            <div className="hidden sm:flex items-center bg-[#282a2c] px-4 py-2 rounded-full w-[400px] max-w-full group focus-within:bg-[#333537] transition-colors shadow-sm">
+              <Search size={20} className="text-[#c4c7c5]" />
+              <input 
+                type="text" 
+                placeholder="Search in Drive"
+                className="bg-transparent border-none outline-none text-[#e3e3e3] placeholder-[#c4c7c5] ml-3 w-full text-base"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex flex-col items-end mr-2">
+              <span className="text-sm font-medium text-white leading-tight">{user.name}</span>
+              <span className="text-xs text-[#c4c7c5]">{user.email}</span>
+            </div>
             <button
               onClick={onSignOut}
-              className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white p-2 rounded-md transition-colors cursor-pointer"
+              className="p-2 text-[#e3e3e3] hover:bg-[#333537] rounded-full transition-colors cursor-pointer"
               title="Sign Out"
             >
-              <LogOut size={14} />
+              <LogOut size={20} />
             </button>
           </div>
         </header>
 
-        {/* Dashboard Workspace */}
-        <div className="my-6 space-y-6">
-          {/* Header Bar with Storage Usage */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
-            <div>
-              <h2 className="text-lg font-semibold text-white">
-                Cloud Storage Workspace
-              </h2>
-              <p className="text-xs font-mono text-zinc-400 mt-0.5">
-                Encrypted direct object storage powered by Supabase
-              </p>
-            </div>
-
-            {/* Storage Quota Meter */}
-            <div className="w-full sm:w-64 bg-zinc-900 border border-zinc-800 rounded-md p-2.5 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-mono">
-                <span className="text-zinc-400 flex items-center gap-1">
-                  <HardDrive size={12} />
-                  Storage Usage
-                </span>
-                <span className="text-white font-medium">
-                  {formatBytes(user.storageUsed)} / {formatBytes(user.storageLimit)}
-                </span>
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-6 bg-[#131314]">
+          <div className="max-w-[1600px] mx-auto bg-[#1e1f20] min-h-[calc(100vh-80px)] rounded-3xl p-6 shadow-sm ring-1 ring-white/[0.05]">
+            
+            {/* Breadcrumbs */}
+            <div className="flex items-center justify-between mb-6 border-b border-[#333537] pb-4">
+              <div className="flex items-center gap-1 text-lg sm:text-xl font-medium text-[#e3e3e3]">
+                {folderPath.map((item, index) => (
+                  <div key={index} className="flex items-center">
+                    {index > 0 && <ChevronRight size={20} className="text-[#c4c7c5] mx-1" />}
+                    <button
+                      onClick={() => navigateToBreadcrumb(index)}
+                      className={`hover:bg-[#333537] px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                        index === folderPath.length - 1 ? "text-white" : "text-[#c4c7c5]"
+                      }`}
+                    >
+                      {item.name}
+                    </button>
+                  </div>
+                ))}
               </div>
-              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-white transition-all duration-300"
-                  style={{ width: `${storagePercent}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Controls Bar: Breadcrumbs & Actions */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            {/* Breadcrumb Navigation */}
-            <div className="flex items-center gap-1.5 font-mono text-xs text-zinc-400 overflow-x-auto">
-              {folderPath.map((item, index) => (
-                <div key={index} className="flex items-center gap-1">
-                  {index > 0 && <ChevronRight size={12} className="text-zinc-600" />}
-                  <button
-                    onClick={() => navigateToBreadcrumb(index)}
-                    className={`hover:text-white transition-colors cursor-pointer ${
-                      index === folderPath.length - 1 ? "text-white font-semibold" : ""
-                    }`}
-                  >
-                    {item.name}
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Upload & Create Folder Buttons */}
-            <div className="flex items-center gap-2">
               <button
-                onClick={() => refreshStorage()}
+                onClick={refreshStorage}
                 disabled={loading}
-                className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white text-xs p-2 rounded-md transition-colors cursor-pointer"
-                title="Refresh Storage"
+                className="p-2 text-[#c4c7c5] hover:bg-[#333537] hover:text-[#e3e3e3] rounded-full transition-colors cursor-pointer"
+                title="Refresh"
               >
-                <RefreshCw size={13} className={loading ? "animate-spin text-white" : ""} />
-              </button>
-
-              <button
-                onClick={() => setNewFolderOpen(true)}
-                className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 text-xs font-medium px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                <FolderPlus size={14} />
-                <span>New Folder</span>
-              </button>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={handleDirectUpload}
-              />
-
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="bg-white text-black hover:bg-zinc-200 disabled:bg-zinc-800 disabled:text-zinc-500 text-xs font-medium px-3.5 py-1.5 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                <Upload size={14} />
-                <span>{uploading ? `Uploading (${uploadProgress}%)` : "Upload File"}</span>
+                <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
               </button>
             </div>
-          </div>
 
-          {/* Error Banner */}
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded p-3 text-xs text-red-400 font-mono flex items-center justify-between">
-              <span>{error}</span>
-              <button onClick={() => setError(null)} className="text-red-400 hover:text-white cursor-pointer">
-                <X size={14} />
-              </button>
-            </div>
-          )}
-
-          {/* Inline Create Folder Input */}
-          {newFolderOpen && (
-            <form onSubmit={handleCreateFolder} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-md p-2">
-              <input
-                type="text"
-                required
-                autoFocus
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="Folder name"
-                className="bg-black border border-zinc-800 rounded px-3 py-1 text-xs text-white placeholder-zinc-600 font-mono focus:border-zinc-400 flex-1"
-              />
-              <button
-                type="submit"
-                className="bg-white text-black hover:bg-zinc-200 text-xs font-medium px-3 py-1 rounded cursor-pointer"
-              >
-                Create
-              </button>
-              <button
-                type="button"
-                onClick={() => setNewFolderOpen(false)}
-                className="text-zinc-500 hover:text-white text-xs px-2 py-1 cursor-pointer"
-              >
-                Cancel
-              </button>
-            </form>
-          )}
-
-          {/* Storage Contents Table */}
-          <div className="border border-zinc-800 rounded-md overflow-hidden bg-black">
-            <div className="grid grid-cols-12 px-4 py-2.5 bg-zinc-950 border-b border-zinc-800 text-[11px] font-mono uppercase tracking-wider text-zinc-500">
-              <div className="col-span-6 sm:col-span-6">Name</div>
-              <div className="col-span-3 sm:col-span-3">Size</div>
-              <div className="col-span-3 sm:col-span-3 text-right">Actions</div>
-            </div>
-
-            {loading ? (
-              <div className="p-8 text-center text-xs font-mono text-zinc-500 flex items-center justify-center gap-2">
-                <RefreshCw size={14} className="animate-spin" />
-                <span>Loading files & folders...</span>
+            {/* Error Banner */}
+            {error && (
+              <div className="mb-6 bg-red-900/30 border border-red-500/30 rounded-lg p-3 text-sm text-red-200 flex items-center justify-between">
+                <span>{error}</span>
+                <button onClick={() => setError(null)} className="text-red-300 hover:text-white cursor-pointer p-1 rounded hover:bg-red-900/50">
+                  <X size={16} />
+                </button>
               </div>
-            ) : folders.length === 0 && files.length === 0 ? (
-              <div className="p-12 text-center text-xs font-mono text-zinc-600">
-                This folder is empty. Upload a file or create a folder above.
+            )}
+            
+            {/* Upload Progress */}
+            {uploading && (
+              <div className="mb-6 bg-[#282a2c] rounded-lg p-4 border border-[#333537]">
+                <div className="flex items-center justify-between text-sm font-medium text-[#e3e3e3] mb-2">
+                  <span>Uploading file...</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-[#131314] rounded-full overflow-hidden">
+                  <div className="h-full bg-[#a8c7fa] transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                </div>
+              </div>
+            )}
+
+            {/* Inline New Folder Form */}
+            {newFolderOpen && (
+              <form onSubmit={handleCreateFolder} className="mb-6 flex items-center gap-3 bg-[#282a2c] border border-[#333537] rounded-lg p-3">
+                <FolderIcon size={20} className="text-[#a8c7fa] fill-[#a8c7fa]" />
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="Untitled folder"
+                  className="bg-transparent border-none outline-none text-[#e3e3e3] text-sm flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => setNewFolderOpen(false)}
+                  className="text-sm font-medium text-[#c4c7c5] hover:text-[#e3e3e3] px-3 py-1.5 rounded hover:bg-[#333537] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="text-sm font-medium text-[#c2e7ff] hover:bg-[#a8c7fa]/10 px-4 py-1.5 rounded transition-colors"
+                >
+                  Create
+                </button>
+              </form>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleDirectUpload}
+            />
+
+            {/* Loading State */}
+            {loading ? (
+              <div className="flex items-center justify-center p-12 text-[#c4c7c5]">
+                <RefreshCw size={24} className="animate-spin" />
+              </div>
+            ) : (folders.length === 0 && files.length === 0) ? (
+              <div className="flex flex-col items-center justify-center p-24 text-center">
+                <div className="w-48 h-48 mb-6 relative">
+                  <div className="absolute inset-0 bg-[#282a2c] rounded-full opacity-50 blur-3xl"></div>
+                  <FolderPlus size={100} className="text-[#333537] absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+                </div>
+                <h3 className="text-xl font-medium text-[#e3e3e3] mb-2">A place for all of your files</h3>
+                <p className="text-sm text-[#c4c7c5]">Click 'New' to upload files or create folders.</p>
               </div>
             ) : (
-              <div className="divide-y divide-zinc-900">
-                {/* Folders */}
-                {folders.map((folder) => (
-                  <div
-                    key={folder.id}
-                    className="grid grid-cols-12 px-4 py-3 items-center hover:bg-zinc-900/50 transition-colors group text-xs"
-                  >
-                    <div className="col-span-6 sm:col-span-6 flex items-center gap-2.5 truncate">
-                      <FolderIcon size={16} className="text-zinc-400 shrink-0" />
-                      <button
-                        onClick={() => navigateToFolder(folder)}
-                        className="font-medium text-white hover:underline truncate cursor-pointer text-left"
-                      >
-                        {folder.name}
-                      </button>
-                    </div>
-
-                    <div className="col-span-3 sm:col-span-3 text-zinc-500 font-mono text-[11px]">
-                      Folder
-                    </div>
-
-                    <div className="col-span-3 sm:col-span-3 flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleDeleteFolder(folder.id)}
-                        className="text-zinc-600 hover:text-red-400 p-1 transition-colors cursor-pointer"
-                        title="Delete Folder"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Files */}
-                {files.map((file) => (
-                  <div
-                    key={file.id}
-                    className="grid grid-cols-12 px-4 py-3 items-center hover:bg-zinc-900/50 transition-colors group text-xs"
-                  >
-                    <div className="col-span-6 sm:col-span-6 flex items-center gap-2.5 truncate">
-                      <FileText size={16} className="text-zinc-400 shrink-0" />
-                      <span className="font-mono text-white truncate">{file.name}</span>
-                    </div>
-
-                    <div className="col-span-3 sm:col-span-3 text-zinc-400 font-mono text-[11px]">
-                      {formatBytes(file.size)}
-                    </div>
-
-                    <div className="col-span-3 sm:col-span-3 flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleDownload(file.id)}
-                        className="text-zinc-400 hover:text-white p-1 transition-colors cursor-pointer"
-                        title="Download File (Supabase Presigned GET)"
-                      >
-                        <Download size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteFile(file.id)}
-                        className="text-zinc-600 hover:text-red-400 p-1 transition-colors cursor-pointer"
-                        title="Delete File"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+              <div className="space-y-8">
+                
+                {/* Folders Grid */}
+                {folders.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-[#e3e3e3] mb-4">Folders</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {folders.map((folder) => (
+                        <div
+                          key={folder.id}
+                          className="group flex items-center justify-between p-3.5 bg-[#282a2c] hover:bg-[#333537] rounded-xl border border-transparent hover:border-white/10 transition-colors cursor-pointer select-none"
+                        >
+                          <div 
+                            className="flex items-center gap-3 flex-1 overflow-hidden" 
+                            onClick={() => navigateToFolder(folder)}
+                          >
+                            {/* Linux-style folder icon: bold, filled, blue */}
+                            <FolderIcon size={24} className="text-[#a8c7fa] fill-[#a8c7fa] shrink-0" />
+                            <span className="text-sm font-medium text-[#e3e3e3] truncate">{folder.name}</span>
+                          </div>
+                          
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteFolder(folder.id); }}
+                            className="p-1.5 text-[#c4c7c5] opacity-0 group-hover:opacity-100 hover:bg-[#1e1f20] hover:text-red-400 rounded-full transition-all"
+                            title="Delete folder"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
+                )}
+
+                {/* Files List */}
+                {files.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-[#e3e3e3] mb-4">Files</h3>
+                    <div className="bg-[#1e1f20] rounded-xl overflow-hidden border border-[#333537]">
+                      
+                      {/* Table Header */}
+                      <div className="grid grid-cols-12 px-4 py-3 border-b border-[#333537] text-xs font-medium text-[#c4c7c5]">
+                        <div className="col-span-7 sm:col-span-8">Name</div>
+                        <div className="col-span-3 sm:col-span-2">Size</div>
+                        <div className="col-span-2 sm:col-span-2 text-right">Actions</div>
+                      </div>
+
+                      {/* Table Body */}
+                      <div className="divide-y divide-[#333537]">
+                        {files.map((file) => {
+                          const Icon = getFileIcon(file.name);
+                          return (
+                            <div
+                              key={file.id}
+                              className="grid grid-cols-12 px-4 py-3 items-center hover:bg-[#333537]/50 transition-colors group cursor-default"
+                            >
+                              <div className="col-span-7 sm:col-span-8 flex items-center gap-3 truncate pr-4">
+                                <Icon size={20} className="text-[#a8c7fa] shrink-0" />
+                                <span className="text-sm font-medium text-[#e3e3e3] truncate">{file.name}</span>
+                              </div>
+                              
+                              <div className="col-span-3 sm:col-span-2 text-xs text-[#c4c7c5]">
+                                {formatBytes(file.size)}
+                              </div>
+                              
+                              <div className="col-span-2 sm:col-span-2 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => handleDownload(file.id)}
+                                  className="p-2 text-[#c4c7c5] hover:text-[#e3e3e3] hover:bg-[#282a2c] rounded-full transition-colors"
+                                  title="Download"
+                                >
+                                  <Download size={18} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFile(file.id)}
+                                  className="p-2 text-[#c4c7c5] hover:text-red-400 hover:bg-[#282a2c] rounded-full transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
               </div>
             )}
           </div>
         </div>
-
-        {/* Footer */}
-        <footer className="py-4 border-t border-zinc-800 text-center text-[11px] text-zinc-500 font-mono">
-          File Harbor • Direct Browser-to-Supabase Storage Encrypted Cloud Storage
-        </footer>
-      </div>
+      </main>
+      
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/50 z-30"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
     </div>
   );
 }
