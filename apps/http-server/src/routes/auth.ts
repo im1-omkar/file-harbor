@@ -3,6 +3,9 @@ import bcrypt from "bcrypt";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, type AuthenticatedRequest } from "../middleware/auth.js";
+import { OAuth2Client } from "google-auth-library";
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const authRouter = Router();
 
@@ -18,9 +21,7 @@ const signinSchema = z.object({
 });
 
 const googleAuthSchema = z.object({
-  email: z.string().email(),
-  name: z.string().min(1),
-  avatarUrl: z.string().optional(),
+  credential: z.string(),
 });
 
 const COOKIE_OPTIONS = {
@@ -170,7 +171,21 @@ authRouter.get("/me", requireAuth, (req: AuthenticatedRequest, res) => {
  */
 authRouter.post("/google", async (req, res) => {
   try {
-    const { email, name, avatarUrl } = googleAuthSchema.parse(req.body);
+    const { credential } = googleAuthSchema.parse(req.body);
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      res.status(401).json({ error: "Invalid Google token" });
+      return;
+    }
+
+    const email = payload.email;
+    const name = payload.name || "Google User";
+    const avatarUrl = payload.picture || null;
 
     let user = await prisma.user.findUnique({ where: { email } });
     if (!user) {

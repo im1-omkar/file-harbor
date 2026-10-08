@@ -78,7 +78,7 @@ export const api = {
     return request<{ user: UserProfile }>("/auth/me");
   },
 
-  async googleAuth(data: { email: string; name: string; avatarUrl?: string }) {
+  async googleAuth(data: { credential: string }) {
     return request<{ user: UserProfile }>("/auth/google", {
       method: "POST",
       body: JSON.stringify(data),
